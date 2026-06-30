@@ -1,0 +1,116 @@
+{% extends 'base.html' %}
+{% block title %}Export Prediction #{{ result.id[:8] }} — Rising Waters{% endblock %}
+
+{% block content %}
+{% set prob_pct = (result.flood_probability * 100) | round(1) %}
+{% set risk = result.risk_level() %}
+
+<div class="row mb-4 align-items-center">
+    <div class="col">
+        <h1 class="fw-bold"><i class="bi bi-file-earmark-text"></i> Prediction Report</h1>
+        <p class="text-muted">Reference ID: <code>{{ result.id }}</code></p>
+    </div>
+    <div class="col-auto d-print-none">
+        <button onclick="window.print()" class="btn btn-outline-secondary me-2">
+            <i class="bi bi-printer me-1"></i> Print
+        </button>
+        <a href="{{ url_for('main.prediction_detail', prediction_id=result.id) }}"
+           class="btn btn-outline-primary">
+            <i class="bi bi-arrow-left me-1"></i> Back
+        </a>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header bg-primary text-white">
+        <h5 class="mb-0"><i class="bi bi-water me-2"></i>Rising Waters — Flood Risk Report</h5>
+    </div>
+    <div class="card-body">
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <h6 class="text-muted text-uppercase small mb-3">Report Info</h6>
+                <table class="table table-sm">
+                    <tr><th>Report ID</th><td><code>{{ result.id }}</code></td></tr>
+                    <tr><th>Generated</th><td>{{ result.prediction_date.strftime('%Y-%m-%d %H:%M UTC') }}</td></tr>
+                    <tr><th>Analyst</th><td>{{ result.weather_data.user.username or result.weather_data.user.email }}</td></tr>
+                    <tr><th>Region</th><td>{{ result.weather_data.region or 'N/A' }}</td></tr>
+                </table>
+            </div>
+            <div class="col-md-6">
+                <h6 class="text-muted text-uppercase small mb-3">Risk Summary</h6>
+                <div class="p-3 rounded text-center
+                    {% if risk == 'HIGH' %}bg-danger text-white
+                    {% elif risk == 'MEDIUM' %}bg-warning
+                    {% else %}bg-success text-white{% endif %}">
+                    <h2 class="mb-0">{{ prob_pct }}%</h2>
+                    <div class="fw-bold">{{ risk }} RISK</div>
+                    <small>Flood {{ 'Likely' if result.flood_result else 'Unlikely' }}</small>
+                </div>
+            </div>
+        </div>
+
+        <h6 class="text-muted text-uppercase small mb-3">Meteorological Input Data</h6>
+        <div class="table-responsive mb-4">
+            <table class="table table-bordered">
+                <thead class="table-light">
+                    <tr>
+                        <th>Parameter</th>
+                        <th>Value</th>
+                        <th>Unit</th>
+                        <th>Normal Range</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Annual Rainfall</td>
+                        <td class="fw-bold">{{ result.weather_data.annual_rainfall }}</td>
+                        <td>mm</td><td>0 – 10,000</td>
+                    </tr>
+                    <tr>
+                        <td>Cloud Visibility</td>
+                        <td class="fw-bold">{{ result.weather_data.cloud_visibility }}</td>
+                        <td>km</td><td>0 – 100</td>
+                    </tr>
+                    <tr>
+                        <td>Temperature</td>
+                        <td class="fw-bold">{{ result.weather_data.temperature }}</td>
+                        <td>°C</td><td>-50 – 60</td>
+                    </tr>
+                    <tr>
+                        <td>Humidity</td>
+                        <td class="fw-bold">{{ result.weather_data.humidity }}</td>
+                        <td>%</td><td>0 – 100</td>
+                    </tr>
+                    <tr>
+                        <td>Seasonal Rainfall</td>
+                        <td class="fw-bold">{{ result.weather_data.seasonal_rainfall }}</td>
+                        <td>mm</td><td>0 – 10,000</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h6 class="text-muted text-uppercase small mb-3">Model Details</h6>
+        <table class="table table-sm">
+            <tr><th>Model Name</th><td>{{ result.model.name }}</td></tr>
+            <tr><th>Algorithm</th><td>{{ result.model.algorithm_type }}</td></tr>
+            <tr><th>Model Accuracy</th><td>{{ "%.1f" | format(result.model.accuracy) }}%</td></tr>
+            <tr><th>Version</th><td>v{{ result.model.version }}</td></tr>
+            {% if result.processing_time_ms %}
+            <tr><th>Processing Time</th><td>{{ result.processing_time_ms }} ms</td></tr>
+            {% endif %}
+        </table>
+
+        {% if result.weather_data.notes %}
+        <h6 class="text-muted text-uppercase small mb-2">Notes</h6>
+        <p class="border rounded p-3 bg-light">{{ result.weather_data.notes }}</p>
+        {% endif %}
+
+        <div class="alert alert-info mt-3 mb-0 small">
+            <i class="bi bi-info-circle me-1"></i>
+            This report is generated automatically by the Rising Waters flood risk intelligence system.
+            Results should be corroborated with on-ground observations before activating emergency protocols.
+        </div>
+    </div>
+</div>
+{% endblock %}

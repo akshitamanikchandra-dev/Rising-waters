@@ -1,0 +1,143 @@
+{% extends 'base.html' %}
+{% block title %}Prediction Result — Rising Waters{% endblock %}
+
+{% block content %}
+{% set prob_pct = (result.flood_probability * 100) | round(1) %}
+{% set risk = result.risk_level() %}
+
+<div class="row mb-4 align-items-center">
+    <div class="col">
+        <h1 class="mb-1 fw-bold"><i class="bi bi-file-earmark-bar-graph"></i> Prediction Result</h1>
+        <p class="text-muted mb-0">
+            Recorded on {{ result.prediction_date.strftime('%B %d, %Y at %H:%M UTC') }}
+        </p>
+    </div>
+    <div class="col-auto">
+        <a href="{{ url_for('main.prediction_export', prediction_id=result.id) }}"
+           class="btn btn-outline-secondary me-2" target="_blank">
+            <i class="bi bi-download me-1"></i> Export
+        </a>
+        <a href="{{ url_for('main.predictions_list') }}" class="btn btn-outline-primary">
+            <i class="bi bi-arrow-left me-1"></i> All Predictions
+        </a>
+    </div>
+</div>
+
+<!-- Risk banner -->
+<div class="alert {% if risk == 'HIGH' %}alert-danger{% elif risk == 'MEDIUM' %}alert-warning{% else %}alert-success{% endif %} mb-4" role="alert">
+    <div class="d-flex align-items-center gap-3">
+        <i class="bi {% if risk == 'HIGH' %}bi-exclamation-triangle-fill{% elif risk == 'MEDIUM' %}bi-exclamation-circle-fill{% else %}bi-check-circle-fill{% endif %} fs-3"></i>
+        <div>
+            <h5 class="mb-0">{{ risk }} RISK — {{ prob_pct }}% Flood Probability</h5>
+            <small>
+                {% if risk == 'HIGH' %}Immediate monitoring and response preparation recommended.
+                {% elif risk == 'MEDIUM' %}Continue monitoring and update predictions with new data.
+                {% else %}Conditions appear safe. Continue routine monitoring.{% endif %}
+            </small>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Probability gauge -->
+    <div class="col-lg-4">
+        <div class="card h-100 text-center p-4">
+            <h5 class="mb-3 fw-semibold">Flood Probability</h5>
+            <div class="position-relative d-inline-flex align-items-center justify-content-center mx-auto mb-3"
+                 style="width:140px;height:140px;border-radius:50%;background:conic-gradient(
+                     {% if risk == 'HIGH' %}#ef4444{% elif risk == 'MEDIUM' %}#f59e0b{% else %}#10b981{% endif %}
+                     {{ prob_pct * 3.6 }}deg, #e2e8f0 0);">
+                <div style="width:100px;height:100px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;">
+                    <span class="fw-bold" style="font-size:1.6rem;">{{ prob_pct }}%</span>
+                </div>
+            </div>
+            <span class="badge fs-6 px-3 py-2 risk-{{ risk | lower }}">{{ risk }} RISK</span>
+            {% if result.processing_time_ms %}
+                <p class="text-muted mt-3 mb-0 small">Processed in {{ result.processing_time_ms }}ms</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Input data -->
+    <div class="col-lg-4">
+        <div class="card h-100">
+            <div class="card-header bg-light">
+                <span class="fw-bold"><i class="bi bi-database me-1"></i> Input Data</span>
+            </div>
+            <div class="card-body p-0">
+                <table class="table mb-0">
+                    <tbody>
+                        <tr>
+                            <td class="text-muted small">Annual Rainfall</td>
+                            <td class="fw-semibold">{{ result.weather_data.annual_rainfall }} mm</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted small">Cloud Visibility</td>
+                            <td class="fw-semibold">{{ result.weather_data.cloud_visibility }} km</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted small">Temperature</td>
+                            <td class="fw-semibold">{{ result.weather_data.temperature }} °C</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted small">Humidity</td>
+                            <td class="fw-semibold">{{ result.weather_data.humidity }} %</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted small">Seasonal Rainfall</td>
+                            <td class="fw-semibold">{{ result.weather_data.seasonal_rainfall }} mm</td>
+                        </tr>
+                        {% if result.weather_data.region %}
+                        <tr>
+                            <td class="text-muted small">Region</td>
+                            <td class="fw-semibold">{{ result.weather_data.region }}</td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Model & metadata -->
+    <div class="col-lg-4">
+        <div class="card h-100">
+            <div class="card-header bg-light">
+                <span class="fw-bold"><i class="bi bi-cpu me-1"></i> Model Details</span>
+            </div>
+            <div class="card-body">
+                <p class="mb-2"><strong>Model:</strong> {{ result.model.name }}</p>
+                <p class="mb-2"><strong>Algorithm:</strong> {{ result.model.algorithm_type }}</p>
+                <p class="mb-2"><strong>Accuracy:</strong> {{ "%.1f" | format(result.model.accuracy) }}%</p>
+                <p class="mb-2"><strong>Version:</strong> v{{ result.model.version }}</p>
+                <hr>
+                <p class="mb-2"><strong>Flood Detected:</strong>
+                    {% if result.flood_result %}
+                        <span class="badge bg-danger">Yes</span>
+                    {% else %}
+                        <span class="badge bg-success">No</span>
+                    {% endif %}
+                </p>
+                {% if result.confidence %}
+                <p class="mb-0"><strong>Confidence:</strong> {{ (result.confidence * 100) | round(1) }}%</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if result.weather_data.notes %}
+<div class="card mt-4">
+    <div class="card-header bg-light">
+        <span class="fw-bold"><i class="bi bi-sticky me-1"></i> Notes</span>
+    </div>
+    <div class="card-body">{{ result.weather_data.notes }}</div>
+</div>
+{% endif %}
+
+<div class="mt-4">
+    <a href="{{ url_for('main.predict') }}" class="btn btn-primary">
+        <i class="bi bi-plus-circle me-1"></i> New Prediction
+    </a>
+</div>
+{% endblock %}

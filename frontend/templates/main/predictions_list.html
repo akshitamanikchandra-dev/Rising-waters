@@ -1,0 +1,121 @@
+{% extends 'base.html' %}
+{% block title %}My Predictions — Rising Waters{% endblock %}
+
+{% block content %}
+<div class="row mb-4 align-items-center">
+    <div class="col">
+        <h1 class="mb-1 fw-bold"><i class="bi bi-list-ul"></i> My Predictions</h1>
+        <p class="text-muted mb-0">All flood risk assessments you have submitted.</p>
+    </div>
+    <div class="col-auto">
+        <a href="{{ url_for('main.predict') }}" class="btn btn-primary">
+            <i class="bi bi-plus-circle me-1"></i> New Prediction
+        </a>
+    </div>
+</div>
+
+{% if pagination.items %}
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Date</th>
+                        <th>Region</th>
+                        <th>Probability</th>
+                        <th>Risk Level</th>
+                        <th>Model</th>
+                        <th>Result</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for result in pagination.items %}
+                    {% set risk = result.risk_level() %}
+                    <tr>
+                        <td class="text-muted small">
+                            {{ result.prediction_date.strftime('%Y-%m-%d %H:%M') }}
+                        </td>
+                        <td>{{ result.weather_data.region or '—' }}</td>
+                        <td>
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="progress flex-grow-1" style="height:6px;max-width:80px;">
+                                    <div class="progress-bar
+                                        {% if risk == 'HIGH' %}bg-danger{% elif risk == 'MEDIUM' %}bg-warning{% else %}bg-success{% endif %}"
+                                         style="width:{{ (result.flood_probability * 100) | round }}%"></div>
+                                </div>
+                                <small class="fw-semibold">{{ (result.flood_probability * 100) | round(1) }}%</small>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="badge risk-{{ risk | lower }} px-2 py-1">{{ risk }}</span>
+                        </td>
+                        <td>
+                            <small>{{ result.model.algorithm_type }}</small>
+                        </td>
+                        <td>
+                            {% if result.flood_result %}
+                                <span class="badge bg-danger">Flood Likely</span>
+                            {% else %}
+                                <span class="badge bg-success">No Flood</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{{ url_for('main.prediction_detail', prediction_id=result.id) }}"
+                               class="btn btn-sm btn-outline-primary">View</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Pagination -->
+{% if pagination.pages > 1 %}
+<nav class="mt-4" aria-label="Predictions pagination">
+    <ul class="pagination justify-content-center">
+        {% if pagination.has_prev %}
+            <li class="page-item">
+                <a class="page-link" href="{{ url_for('main.predictions_list', page=pagination.prev_num) }}">Previous</a>
+            </li>
+        {% else %}
+            <li class="page-item disabled"><span class="page-link">Previous</span></li>
+        {% endif %}
+
+        {% for p in pagination.iter_pages(left_edge=2, right_edge=2, left_current=2, right_current=2) %}
+            {% if p %}
+                <li class="page-item {% if p == pagination.page %}active{% endif %}">
+                    <a class="page-link" href="{{ url_for('main.predictions_list', page=p) }}">{{ p }}</a>
+                </li>
+            {% else %}
+                <li class="page-item disabled"><span class="page-link">…</span></li>
+            {% endif %}
+        {% endfor %}
+
+        {% if pagination.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="{{ url_for('main.predictions_list', page=pagination.next_num) }}">Next</a>
+            </li>
+        {% else %}
+            <li class="page-item disabled"><span class="page-link">Next</span></li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+
+{% else %}
+<div class="card">
+    <div class="card-body text-center py-5">
+        <i class="bi bi-inbox display-3 text-muted"></i>
+        <h5 class="mt-3 text-muted">No predictions yet</h5>
+        <p class="text-muted">Submit your first flood risk assessment to get started.</p>
+        <a href="{{ url_for('main.predict') }}" class="btn btn-primary">
+            <i class="bi bi-lightning-charge me-1"></i> Make First Prediction
+        </a>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

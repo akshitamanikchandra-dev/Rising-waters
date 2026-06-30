@@ -1,0 +1,172 @@
+{% extends 'base.html' %}
+{% block title %}New Prediction — Rising Waters{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h1 class="mb-1 fw-bold"><i class="bi bi-lightning-charge"></i> New Flood Prediction</h1>
+        <p class="text-muted">Enter meteorological data to assess flood risk probability.</p>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Form -->
+    <div class="col-lg-7 mb-4">
+        <div class="card">
+            <div class="card-header bg-light">
+                <span class="fw-bold"><i class="bi bi-input-cursor-text me-1"></i> Weather Input Data</span>
+            </div>
+            <div class="card-body p-4">
+                <form method="POST" action="{{ url_for('main.predict') }}" novalidate id="predictForm">
+                    {{ form.hidden_tag() }}
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-sm-6">
+                            <label class="form-label fw-semibold">
+                                <i class="bi bi-cloud-rain me-1 text-primary"></i>
+                                {{ form.annual_rainfall.label.text }}
+                            </label>
+                            {{ form.annual_rainfall(class="form-control" + (" is-invalid" if form.annual_rainfall.errors else "")) }}
+                            {% for e in form.annual_rainfall.errors %}
+                                <div class="invalid-feedback">{{ e }}</div>
+                            {% endfor %}
+                        </div>
+                        <div class="col-sm-6">
+                            <label class="form-label fw-semibold">
+                                <i class="bi bi-clouds me-1 text-info"></i>
+                                {{ form.cloud_visibility.label.text }}
+                            </label>
+                            {{ form.cloud_visibility(class="form-control" + (" is-invalid" if form.cloud_visibility.errors else "")) }}
+                            {% for e in form.cloud_visibility.errors %}
+                                <div class="invalid-feedback">{{ e }}</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-sm-6">
+                            <label class="form-label fw-semibold">
+                                <i class="bi bi-thermometer-half me-1 text-danger"></i>
+                                {{ form.temperature.label.text }}
+                            </label>
+                            {{ form.temperature(class="form-control" + (" is-invalid" if form.temperature.errors else "")) }}
+                            {% for e in form.temperature.errors %}
+                                <div class="invalid-feedback">{{ e }}</div>
+                            {% endfor %}
+                        </div>
+                        <div class="col-sm-6">
+                            <label class="form-label fw-semibold">
+                                <i class="bi bi-droplet-half me-1 text-primary"></i>
+                                {{ form.humidity.label.text }}
+                            </label>
+                            {{ form.humidity(class="form-control" + (" is-invalid" if form.humidity.errors else "")) }}
+                            {% for e in form.humidity.errors %}
+                                <div class="invalid-feedback">{{ e }}</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">
+                            <i class="bi bi-cloud-drizzle me-1 text-success"></i>
+                            {{ form.seasonal_rainfall.label.text }}
+                        </label>
+                        {{ form.seasonal_rainfall(class="form-control" + (" is-invalid" if form.seasonal_rainfall.errors else "")) }}
+                        {% for e in form.seasonal_rainfall.errors %}
+                            <div class="invalid-feedback">{{ e }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">
+                            <i class="bi bi-geo-alt me-1 text-warning"></i>
+                            {{ form.region.label.text }}
+                        </label>
+                        {{ form.region(class="form-control") }}
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">ML Model</label>
+                        {% if form.model_id.errors %}
+                            {{ form.model_id(class="form-select is-invalid") }}
+                            {% for e in form.model_id.errors %}
+                                <div class="invalid-feedback">{{ e }}</div>
+                            {% endfor %}
+                        {% else %}
+                            {{ form.model_id(class="form-select") }}
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold">Notes (optional)</label>
+                        {{ form.notes(class="form-control") }}
+                    </div>
+
+                    {% if models %}
+                        <button type="submit" class="btn btn-primary btn-lg w-100" id="submitBtn">
+                            <i class="bi bi-lightning-charge me-1"></i> Run Prediction
+                        </button>
+                    {% else %}
+                        <button type="button" class="btn btn-secondary btn-lg w-100" disabled>
+                            No Models Available
+                        </button>
+                    {% endif %}
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reference panel -->
+    <div class="col-lg-5">
+        <div class="card mb-3">
+            <div class="card-header bg-light">
+                <span class="fw-bold"><i class="bi bi-info-circle me-1"></i> Input Reference</span>
+            </div>
+            <div class="card-body p-3">
+                <table class="table table-sm mb-0">
+                    <thead><tr><th>Feature</th><th>Range</th><th>Unit</th></tr></thead>
+                    <tbody>
+                        <tr><td>Annual Rainfall</td><td>0 – 10,000</td><td>mm</td></tr>
+                        <tr><td>Cloud Visibility</td><td>0 – 100</td><td>km</td></tr>
+                        <tr><td>Temperature</td><td>-50 – 60</td><td>°C</td></tr>
+                        <tr><td>Humidity</td><td>0 – 100</td><td>%</td></tr>
+                        <tr><td>Seasonal Rainfall</td><td>0 – 10,000</td><td>mm</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header bg-light">
+                <span class="fw-bold"><i class="bi bi-bar-chart me-1"></i> Risk Levels</span>
+            </div>
+            <div class="card-body p-3">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <span class="badge risk-high px-2 py-1">HIGH</span>
+                    <small class="text-muted">≥ 70% probability — immediate attention required</small>
+                </div>
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <span class="badge risk-medium px-2 py-1">MEDIUM</span>
+                    <small class="text-muted">40–70% probability — monitor conditions</small>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge risk-low px-2 py-1">LOW</span>
+                    <small class="text-muted">&lt; 40% probability — conditions normal</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.getElementById('predictForm').addEventListener('submit', function() {
+    const btn = document.getElementById('submitBtn');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Running…';
+    }
+});
+</script>
+{% endblock %}

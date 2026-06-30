@@ -1,0 +1,171 @@
+{% extends 'base.html' %}
+
+{% block title %}ML Models - Flood Prediction System{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h1 class="mb-2">
+            <i class="bi bi-diagram-3"></i> Machine Learning Models
+        </h1>
+        <p class="text-muted">Available flood prediction models and their performance metrics</p>
+    </div>
+</div>
+
+<!-- Models Grid -->
+<div class="row">
+    {% if models %}
+        {% for model in models %}
+        <div class="col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-body">
+                    <!-- Model Header -->
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <div>
+                            <h5>{{ model.name }}</h5>
+                            <span class="badge bg-secondary">{{ model.algorithm_type }}</span>
+                            {% if model.is_active %}
+                                <span class="badge bg-success">Active</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Inactive</span>
+                            {% endif %}
+                        </div>
+                        <div class="text-end">
+                            <small class="text-muted">v{{ model.version }}</small>
+                        </div>
+                    </div>
+                    
+                    <!-- Model Description -->
+                    {% if model.description %}
+                    <p class="text-muted small mb-3">{{ model.description }}</p>
+                    {% endif %}
+                    
+                    <!-- Performance Metrics -->
+                    <hr>
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <label class="text-muted small">Model Accuracy</label>
+                            <strong>{{ "%.2f" | format(model.accuracy) }}%</strong>
+                        </div>
+                        <div class="progress" style="height: 8px;">
+                            <div class="progress-bar bg-success" 
+                                 style="width: {{ model.accuracy }}%"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Model Stats -->
+                    <div class="row small text-muted mb-3">
+                        <div class="col-6">
+                            <i class="bi bi-graph-up"></i> 
+                            <strong>{{ model.predictions | length }}</strong> Predictions
+                        </div>
+                        <div class="col-6">
+                            <i class="bi bi-calendar"></i>
+                            Created {{ model.created_at.strftime('%Y-%m-%d') }}
+                        </div>
+                    </div>
+                    
+                    <!-- Algorithm Info -->
+                    <hr>
+                    <div class="mb-3">
+                        <h6 class="mb-2">Algorithm Details</h6>
+                        <div class="p-3 rounded small mb-0" style="background: var(--surface2); border: 1px solid var(--border);">
+                            <strong>Type:</strong> {{ model.algorithm_type }}<br>
+                            <strong>File:</strong> <code>{{ model.model_file | basename }}</code><br>
+                            <strong>Training:</strong> {{ model.created_at.strftime('%Y-%m-%d %H:%M') }}
+                        </div>
+                    </div>
+                    
+                    <!-- Algorithm Characteristics -->
+                    <div class="p-3 rounded small mb-0" style="background: var(--surface2); border: 1px solid var(--border);">
+                        {% if model.algorithm_type == 'XGBoost' %}
+                            <strong>Strengths:</strong> High accuracy, handles non-linear patterns, robust to outliers<br>
+                            <strong>Use Case:</strong> Primary model for production predictions
+                        {% elif model.algorithm_type == 'Random Forest' %}
+                            <strong>Strengths:</strong> Good accuracy, handles feature importance well, parallel processing<br>
+                            <strong>Use Case:</strong> Ensemble-based prediction
+                        {% elif model.algorithm_type == 'Decision Tree' %}
+                            <strong>Strengths:</strong> Interpretable, fast inference, good for rule-based decisions<br>
+                            <strong>Use Case:</strong> Quick decisions with clear logic
+                        {% elif model.algorithm_type == 'K-Nearest Neighbors' %}
+                            <strong>Strengths:</strong> Simple, no training required, instance-based<br>
+                            <strong>Use Case:</strong> Comparison baseline
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="col-12">
+            <div class="alert alert-info text-center">
+                <i class="bi bi-info-circle"></i>
+                <p>No ML models available at the moment. Please contact the administrator.</p>
+            </div>
+        </div>
+    {% endif %}
+</div>
+
+<!-- Model Comparison -->
+{% if models | length > 1 %}
+<div class="row mt-5">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-light">
+                <h5 class="mb-0">
+                    <i class="bi bi-bar-chart"></i> Model Comparison
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Model Name</th>
+                                <th>Algorithm</th>
+                                <th>Accuracy</th>
+                                <th>Predictions Used</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for model in models %}
+                            <tr>
+                                <td><strong>{{ model.name }}</strong></td>
+                                <td>{{ model.algorithm_type }}</td>
+                                <td>
+                                    <span class="badge bg-success">{{ "%.2f" | format(model.accuracy) }}%</span>
+                                </td>
+                                <td>{{ model.predictions | length }}</td>
+                                <td>
+                                    {% if model.is_active %}
+                                        <span class="badge bg-success">Active</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Inactive</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Model Information Guide -->
+<div class="row mt-5">
+    <div class="col-12">
+        <div class="alert alert-info">
+            <h5><i class="bi bi-info-circle"></i> Understanding Model Accuracy</h5>
+            <p class="mb-0">
+                <strong>Model Accuracy</strong> is the percentage of correct predictions the model made on historical test data. 
+                A higher accuracy indicates better prediction performance. The system uses the most accurate available model 
+                for new predictions unless specified otherwise.
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}
