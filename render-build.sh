@@ -5,7 +5,7 @@ echo "Installing dependencies..."
 pip install -r requirements.txt
 
 echo "Seeding ML models..."
-python seed_model.py
+python seed_models.py
 
 echo "Running database migrations..."
 python -c "from app import app, db; app.app_context().push(); db.create_all(); print('✓ Database initialized')"
