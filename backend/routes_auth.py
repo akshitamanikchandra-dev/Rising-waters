@@ -1,16 +1,16 @@
 import os
+import requests
 from datetime import datetime
 
 from flask import (Blueprint, render_template, request, redirect, url_for,
                    flash, session, current_app)
 from flask_login import login_user, logout_user, login_required, current_user
-from flask_mail import Message
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, BooleanField, SubmitField
 from wtforms.validators import DataRequired, EqualTo, Length, ValidationError, Regexp
 
 from models import db, User
-from app import mail, oauth
+from app import oauth
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
 
@@ -26,9 +26,9 @@ def _is_safe_url(url):
 
 
 def _send_email(to, subject, body_html):
-    """Send email via Flask-Mail. In dev (no MAIL_USERNAME), flash the link instead."""
-    username = current_app.config.get('MAIL_USERNAME', '').strip()
-    if not username:
+    """Send email via Brevo's HTTP API. In dev (no BREVO_API_KEY), flash the link instead."""
+    api_key = current_app.config.get('BREVO_API_KEY', '').strip()
+    if not api_key:
         import re
         match = re.search(r'href="([^"]+)"', body_html)
         if match:
@@ -37,15 +37,36 @@ def _send_email(to, subject, body_html):
             _flash(f'[DEV — no mail] Click to proceed: <a href="{link}">{link}</a>', 'info')
         current_app.logger.warning(f'[DEV] Email to {to}: {subject}')
         return True, None
+
+    sender_email = current_app.config.get('MAIL_DEFAULT_SENDER', 'noreply@floodprediction.com')
+
+    payload = {
+        "sender": {"name": "Rising Waters", "email": sender_email},
+        "to": [{"email": to}],
+        "subject": subject,
+        "htmlContent": body_html,
+    }
+    headers = {
+        "accept": "application/json",
+        "api-key": api_key,
+        "content-type": "application/json",
+    }
+
     try:
-        msg = Message(subject,
-                      recipients=[to],
-                      html=body_html,
-                      sender=current_app.config['MAIL_DEFAULT_SENDER'])
-        mail.send(msg)
-        return True, None
-    except Exception as exc:
-        current_app.logger.error(f'Mail error: {exc}')
+        response = requests.post(
+            "https://api.brevo.com/v3/smtp/email",
+            json=payload,
+            headers=headers,
+            timeout=10,
+        )
+        if response.status_code in (200, 201):
+            return True, None
+        else:
+            err = f"Brevo API error {response.status_code}: {response.text}"
+            current_app.logger.error(err)
+            return False, err
+    except requests.exceptions.RequestException as exc:
+        current_app.logger.error(f'Brevo request failed: {exc}')
         return False, str(exc)
 
 

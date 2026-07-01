@@ -50,6 +50,7 @@ class Config:
     APP_NAME = 'Flood Prediction System'
     APP_DOMAIN = os.getenv('APP_DOMAIN', 'http://localhost:5000')
     PASSWORD_MIN_LENGTH = 8
+    BREVO_API_KEY = os.getenv('BREVO_API_KEY', '')
 
 
 class DevelopmentConfig(Config):
