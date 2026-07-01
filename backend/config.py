@@ -11,7 +11,11 @@ class Config:
 
     # Database
     _raw_db_url = os.getenv('DATABASE_URL', 'sqlite:///flood_prediction.db')
-    SQLALCHEMY_DATABASE_URI = _raw_db_url.replace('postgres://', 'postgresql://', 1)
+    if _raw_db_url.startswith('postgres://'):
+        _raw_db_url = _raw_db_url.replace('postgres://', 'postgresql+psycopg://', 1)
+    elif _raw_db_url.startswith('postgresql://'):
+        _raw_db_url = _raw_db_url.replace('postgresql://', 'postgresql+psycopg://', 1)
+    SQLALCHEMY_DATABASE_URI = _raw_db_url
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {'pool_pre_ping': True, 'pool_recycle': 300}
 
@@ -41,16 +45,7 @@ class Config:
     MAIL_USE_SSL = os.getenv('MAIL_USE_SSL', 'False') == 'True'
     MAIL_USERNAME = os.getenv('MAIL_USERNAME', '')
     MAIL_PASSWORD = os.getenv('MAIL_PASSWORD', '')
-    MAIL_DEFAULT_SENDER = os.getenv('MAIL_DEFAULT_SENDER', 'noreply@floodprediction.com')
-
-    # Twilio SMS
-    TWILIO_ACCOUNT_SID = os.getenv('TWILIO_ACCOUNT_SID', '')
-    TWILIO_AUTH_TOKEN = os.getenv('TWILIO_AUTH_TOKEN', '')
-    TWILIO_PHONE_NUMBER = os.getenv('TWILIO_PHONE_NUMBER', '')
-
-    # OTP
-    OTP_EXPIRE_SECONDS = 600   # 10 minutes
-    OTP_LENGTH = 6
+    MAIL_DEFAULT_SENDER = os.getenv('MAIL_DEFAULT_SENDER', 'm.akshita.c@gmail.com')
 
     APP_NAME = 'Flood Prediction System'
     APP_DOMAIN = os.getenv('APP_DOMAIN', 'http://localhost:5000')
