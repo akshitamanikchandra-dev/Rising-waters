@@ -169,6 +169,7 @@ def signup():
 
         except Exception:
             db.session.rollback()
+            current_app.logger.exception('Manual signup failed for %s', form.email.data)
             flash('Account creation failed. Please try again.', 'danger')
             return render_template('auth/signup.html', form=form)
 
@@ -337,6 +338,7 @@ def google_callback():
         db.session.commit()
     except Exception:
         db.session.rollback()
+        current_app.logger.exception('Google signup failed for %s', email)
         flash('Account creation failed. Please try again.', 'danger')
         return redirect(url_for('auth.login'))
 
