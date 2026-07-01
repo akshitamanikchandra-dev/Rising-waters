@@ -3,8 +3,6 @@ from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
 import uuid
-import pyotp
-from sqlalchemy import JSON
 
 db = SQLAlchemy()
 
@@ -20,12 +18,6 @@ class User(UserMixin, db.Model):
     # Google OAuth
     google_id = db.Column(db.String(255), unique=True, nullable=True, index=True)
     google_picture = db.Column(db.Text, nullable=True)
-
-    # Phone & SMS OTP
-    phone = db.Column(db.String(20), unique=True, nullable=True, index=True)
-    phone_verified = db.Column(db.Boolean, default=False)
-    sms_otp = db.Column(db.String(6), nullable=True)
-    sms_otp_expiry = db.Column(db.DateTime, nullable=True)
 
     # Email verification
     email_verified = db.Column(db.Boolean, default=False)
@@ -55,26 +47,6 @@ class User(UserMixin, db.Model):
         if not self.password_hash:
             return False
         return check_password_hash(self.password_hash, password)
-
-    # ------------------------------------------------------------------ SMS OTP
-    def generate_sms_otp(self):
-        import random
-        self.sms_otp = ''.join([str(random.randint(0, 9)) for _ in range(6)])
-        self.sms_otp_expiry = datetime.utcnow() + timedelta(minutes=10)
-        return self.sms_otp
-
-    def verify_sms_otp(self, token):
-        if not self.sms_otp or not self.sms_otp_expiry:
-            return False
-        if datetime.utcnow() > self.sms_otp_expiry:
-            self.sms_otp = None
-            self.sms_otp_expiry = None
-            return False
-        return self.sms_otp == str(token).strip()
-
-    def clear_sms_otp(self):
-        self.sms_otp = None
-        self.sms_otp_expiry = None
 
     # ------------------------------------------------------------------ email verification
     def generate_email_token(self):
