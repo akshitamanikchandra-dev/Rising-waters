@@ -1,5 +1,5 @@
 import os
-from flask import Flask, render_template
+from flask import Flask, redirect, render_template, url_for
 from flask_login import LoginManager
 from flask_mail import Mail
 from flask_wtf.csrf import CSRFProtect
@@ -60,6 +60,14 @@ def create_app(config_name='development'):
     from routes_main import main_bp
     app.register_blueprint(auth_bp)
     app.register_blueprint(main_bp)
+    from flask import request
+    from flask_login import current_user
+    @app.before_request
+    def enforce_profile_completion():
+        if current_user.is_authenticated and (not current_user.phone or not current_user.username):
+            allowed_endpoints = {'auth.complete_profile', 'auth.logout', 'static'}
+            if request.endpoint not in allowed_endpoints:
+                return redirect(url_for('auth.complete_profile'))
 
     _register_error_handlers(app)
 

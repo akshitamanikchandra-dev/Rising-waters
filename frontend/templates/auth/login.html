@@ -45,8 +45,8 @@
         <form method="POST" action="{{ url_for('auth.login') }}" novalidate>
             {{ form.hidden_tag() }}
             <div class="mb-3">
-                <label class="form-label"><i class="bi bi-person me-1"></i>Email or Phone Number</label>
-                {{ form.identifier(class="form-control" + (" is-invalid" if form.identifier.errors else ""), placeholder="your@email.com or phone number") }}
+                <label class="form-label"><i class="bi bi-person me-1"></i>Email, Phone Number, or Username</label>
+                {{ form.identifier(class="form-control" + (" is-invalid" if form.identifier.errors else ""), placeholder="Email, phone, or username") }}
                 {% for e in form.identifier.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
             </div>
             <div class="mb-3">

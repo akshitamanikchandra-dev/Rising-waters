@@ -113,9 +113,9 @@ class SignUpForm(FlaskForm):
 
 
 class LoginForm(FlaskForm):
-    identifier = StringField('Email or Phone Number',
+    identifier = StringField('Email, Phone, or Username',
         validators=[DataRequired()],
-        render_kw={'class': 'form-control', 'placeholder': 'your@email.com or phone number'})
+        render_kw={'class': 'form-control', 'placeholder': 'Email, phone number, or username'})
     password = PasswordField('Password',
         validators=[DataRequired()],
         render_kw={'class': 'form-control', 'placeholder': '••••••••'})
@@ -140,14 +140,23 @@ class ResetPasswordForm(FlaskForm):
     submit = SubmitField('Reset Password', render_kw={'class': 'btn btn-primary w-100'})
 
 
-class PhoneForm(FlaskForm):
+class CompleteProfileForm(FlaskForm):
+    username = StringField('Username',
+        validators=[DataRequired(), Length(min=3, max=80)],
+        render_kw={'class': 'form-control', 'placeholder': 'Choose a username'})
     phone = StringField('Phone Number',
         validators=[DataRequired(), Regexp(_PHONE_RE, message=_PHONE_MSG)],
         render_kw={'class': 'form-control', 'placeholder': 'e.g. +919876543210'})
     submit = SubmitField('Continue', render_kw={'class': 'btn btn-primary w-100'})
 
+    def validate_username(self, field):
+        existing = User.query.filter_by(username=field.data).first()
+        if existing and existing.id != current_user.id:
+            raise ValidationError('Username already taken.')
+
     def validate_phone(self, field):
-        if User.query.filter_by(phone=field.data).first():
+        existing = User.query.filter_by(phone=field.data).first()
+        if existing and existing.id != current_user.id:
             raise ValidationError('Phone number already registered.')
 
 
@@ -257,7 +266,7 @@ def resend_verification():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Login (email OR phone + password)
+# Login (email OR phone OR username + password)
 # ─────────────────────────────────────────────────────────────────────────────
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
@@ -269,7 +278,9 @@ def login():
     if form.validate_on_submit():
         identifier = form.identifier.data.strip()
         user = User.query.filter(
-            (User.email == identifier) | (User.phone == identifier)
+            (User.email == identifier) |
+            (User.phone == identifier) |
+            (User.username == identifier)
         ).first()
 
         if user and user.check_password(form.password.data):
@@ -289,7 +300,7 @@ def login():
                 next_page = url_for('main.dashboard')
             return redirect(next_page)
         elif not user:
-            flash('No account found with that email or phone number.', 'danger')
+            flash('No account found with that email, phone number, or username.', 'danger')
         else:
             flash('Password is incorrect.', 'danger')
 
@@ -297,20 +308,22 @@ def login():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Complete profile (phone number) — used after Google sign-up
+# Complete profile (username + phone) — required after Google sign-up,
+# or for any existing Google user who hasn't set a phone yet.
 # ─────────────────────────────────────────────────────────────────────────────
 
 @auth_bp.route('/complete-profile', methods=['GET', 'POST'])
 @login_required
 def complete_profile():
-    if current_user.phone:
+    if current_user.phone and current_user.username:
         return redirect(url_for('main.dashboard'))
 
-    form = PhoneForm()
+    form = CompleteProfileForm(obj=current_user)
     if form.validate_on_submit():
+        current_user.username = form.username.data
         current_user.phone = form.phone.data
         db.session.commit()
-        flash('Phone number saved!', 'success')
+        flash('Profile completed! Welcome to Rising Waters.', 'success')
         return redirect(url_for('main.dashboard'))
 
     return render_template('auth/complete_profile.html', form=form)
@@ -366,15 +379,18 @@ def google_callback():
         return redirect(url_for('main.dashboard'))
 
     # New user — Google already verifies the email, so create the account immediately.
+    # Username is a temporary placeholder; the person must choose their real one
+    # (and a phone number) on the complete-profile step before using the site.
     raw_username = (name or email.split('@')[0])
-    username = re.sub(r'[^a-zA-Z0-9]', '', raw_username).lower() or email.split('@')[0]
-    base, counter = username, 1
-    while User.query.filter_by(username=username).first():
-        username = f'{base}{counter}'
+    suggested = re.sub(r'[^a-zA-Z0-9]', '', raw_username).lower() or email.split('@')[0]
+    placeholder = suggested
+    base, counter = placeholder, 1
+    while User.query.filter_by(username=placeholder).first():
+        placeholder = f'{base}{counter}'
         counter += 1
 
     user = User(
-        username=username,
+        username=placeholder,
         email=email,
         google_id=google_id,
         google_picture=picture,
@@ -392,7 +408,7 @@ def google_callback():
         return redirect(url_for('auth.login'))
 
     login_user(user, remember=True)
-    flash(f'Welcome to Rising Waters, {user.username}!', 'success')
+    flash('Welcome to Rising Waters! Just one more step to get started.', 'success')
     return redirect(url_for('auth.complete_profile'))
 
 

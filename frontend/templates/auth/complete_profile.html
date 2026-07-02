@@ -22,14 +22,20 @@
         <div class="text-center mb-4">
             <div class="d-inline-flex align-items-center justify-content-center rounded-3 mb-3"
                  style="width:64px;height:64px;background:linear-gradient(135deg,#3b82f6,#06b6d4);font-size:1.75rem;color:#fff;">
-                <i class="bi bi-phone"></i>
+                <i class="bi bi-person-check"></i>
             </div>
-            <h3 class="fw-bold" style="color:#f1f5f9;">One Last Step</h3>
-            <p style="color:#64748b;font-size:0.875rem;">Add your phone number to finish setting up your account</p>
+            <h3 class="fw-bold" style="color:#f1f5f9;">Complete Your Profile</h3>
+            <p style="color:#64748b;font-size:0.875rem;">Choose a username and add your phone number to continue</p>
         </div>
 
         <form method="POST" novalidate>
             {{ form.hidden_tag() }}
+
+            <div class="mb-3">
+                <label class="form-label">Username</label>
+                {{ form.username(class="form-control" + (" is-invalid" if form.username.errors else "")) }}
+                {% for e in form.username.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+            </div>
 
             <div class="mb-4">
                 <label class="form-label">Phone Number</label>
