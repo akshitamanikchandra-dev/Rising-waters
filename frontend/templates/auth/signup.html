@@ -53,6 +53,11 @@
                 {% for e in form.email.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
             </div>
             <div class="mb-3">
+                <label class="form-label">Phone Number</label>
+                {{ form.phone(class="form-control" + (" is-invalid" if form.phone.errors else ""), placeholder="e.g. +919876543210") }}
+                {% for e in form.phone.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+            </div>
+            <div class="mb-3">
                 <label class="form-label">Password</label>
                 {{ form.password(class="form-control" + (" is-invalid" if form.password.errors else "")) }}
                 {% for e in form.password.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
