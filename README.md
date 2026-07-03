@@ -1,204 +1,167 @@
-# Rising Waters — Flood Prediction System
+# Rising Waters
 
-A Flask web app for flood risk prediction using ML models, with full authentication (email/password, Google OAuth, SMS OTP via Twilio).
+Flood risk prediction web application built with Flask, SQLAlchemy, and scikit-learn/XGBoost.
 
----
+It includes:
+- User authentication (email/password + Google OAuth)
+- Email verification and password reset
+- ML model seeding and inference
+- Prediction history, detail views, and dashboard stats
+- Render-ready deployment config
 
-## What Changed in This Version
+## Quick Start
 
-### ML Models Fixed
-- `python backend/seed_models.py` — trains 3 models (Random Forest, Gradient Boosting, Logistic Regression) and registers them in the DB. **Do this once before using the predictions page.**
+### 1. Prerequisites
+- Python 3.14
+- pip
 
-### Authentication Flows
-
-| Flow | Steps |
-|------|-------|
-| Manual Signup | Form (username + email + password + phone) → SMS OTP → phone verified → email verification link sent → user clicks link → account active → login |
-| Google Sign Up | Click Google button → enter phone number → SMS OTP → account created (email auto-verified by Google) → dashboard |
-| Google Sign In | Click Google button → existing account matched → dashboard |
-| SMS OTP Login | Enter registered phone number → receive OTP → enter OTP → dashboard |
-| Email/Password Login | Standard form → dashboard |
-
----
-
-## Local Setup (Python 3.14)
-
-### 1. Create and activate virtual environment
+### 2. Create and activate a virtual environment
 
 Windows:
-```
+```bash
 python -m venv venv
 venv\Scripts\activate
 ```
 
-macOS / Linux:
-```
+macOS/Linux:
+```bash
 python -m venv venv
 source venv/bin/activate
 ```
 
-### 2. Install dependencies
-
-```
+### 3. Install dependencies
+```bash
 pip install -r requirements.txt
 ```
 
-All package versions in requirements.txt are compatible with Python 3.14.
+### 4. Configure environment
+Create a `.env` file in the project root (you can start from `.env.example`) and set values as needed.
 
-### 3. Configure environment
-
-```
-cp .env.example .env
-```
-
-Open `.env` and fill in your values (details below). If Twilio or mail credentials are not set, OTPs and verification links are automatically printed to the terminal — useful for local testing without external services.
-
-### 4. Seed ML models (REQUIRED — do this once)
-
-```
+### 5. Seed ML models (required)
+```bash
 python backend/seed_models.py
 ```
 
-This trains three flood prediction classifiers, saves them to `uploads/models/`, and registers them in the SQLite database. The Predict page will show "No active ML models" until you run this.
+This trains and registers 4 models:
+- Random Forest
+- Gradient Boosting
+- Logistic Regression
+- XGBoost
 
-### 5. Run the app
+Model artifacts are saved in `uploads/models/`, and metadata is stored in the database.
 
-```
+### 6. Run the app
+```bash
 python backend/run.py
 ```
 
-Visit: http://localhost:5000
+Open: http://localhost:5000
 
----
+## Authentication Flows
 
-## Getting Service Credentials
+### Manual signup
+1. User signs up with username, email, phone, and password.
+2. Account is created with `email_verified=False`.
+3. Verification email link is sent.
+4. User clicks verification link.
+5. User can log in.
+
+### Login with password
+- Accepts email, phone, or username + password.
+- If email is unverified, login is blocked until verification.
 
 ### Google OAuth
-1. Go to https://console.cloud.google.com/
-2. Select or create a project → **APIs & Services → Credentials**
-3. Click **Create Credentials → OAuth 2.0 Client ID**
-4. Application type: **Web application**
-5. Under **Authorized redirect URIs**, add:
-   - `http://localhost:5000/auth/google/callback` (local dev)
-   - `https://YOUR_APP.onrender.com/auth/google/callback` (production)
-6. Copy **Client ID** and **Client Secret** into your `.env` file
+1. User clicks Google sign-in.
+2. Existing account is matched by Google ID or email.
+3. Email is treated as verified.
+4. If profile is incomplete, user is redirected to complete profile (username + phone).
 
-### Twilio SMS
-1. Create a free account at https://www.twilio.com/
-2. In the Twilio Console → **Phone Numbers → Manage → Buy a number** (free trial number works)
-3. Copy these three values into your `.env`:
-   - `TWILIO_ACCOUNT_SID`
-   - `TWILIO_AUTH_TOKEN`
-   - `TWILIO_PHONE_NUMBER` (format: +12025551234)
+### Password reset
+1. User requests reset link.
+2. Reset email is sent.
+3. User sets a new password from tokenized link.
 
-### Gmail SMTP (email verification)
-1. Enable **2-Factor Authentication** on the Gmail account you want to send from
-2. Go to https://myaccount.google.com/apppasswords
-3. Create an App Password for **Mail**
-4. Set in `.env`:
-   - `MAIL_USERNAME` = your Gmail address
-   - `MAIL_PASSWORD` = the 16-character App Password (not your regular Gmail password)
+## Environment Variables
 
----
+Key variables used by the app:
 
-## Push to a GitHub Repo
+| Variable | Required | Purpose |
+|---|---|---|
+| `FLASK_ENV` | Yes | `development` or `production` |
+| `SECRET_KEY` | Yes | Session and CSRF security |
+| `DEBUG` | Dev only | Enable debug mode |
+| `DATABASE_URL` | No (dev), Yes (prod) | DB connection string (defaults to SQLite when empty) |
+| `APP_DOMAIN` | Yes | Base URL used in generated links |
+| `GOOGLE_CLIENT_ID` | For Google login | Google OAuth client ID |
+| `GOOGLE_CLIENT_SECRET` | For Google login | Google OAuth client secret |
+| `BREVO_API_KEY` | Optional | If set, emails are sent via Brevo API |
+| `MAIL_DEFAULT_SENDER` | Recommended | Sender email identity |
+| `MAIL_SERVER` | Optional fallback config | Mail settings from config |
+| `MAIL_PORT` | Optional fallback config | Mail settings from config |
+| `MAIL_USE_TLS` | Optional fallback config | Mail settings from config |
+| `MAIL_USE_SSL` | Optional fallback config | Mail settings from config |
+| `MAIL_USERNAME` | Optional fallback config | Mail settings from config |
+| `MAIL_PASSWORD` | Optional fallback config | Mail settings from config |
 
-On GitHub.com, create a new repository. Then in your project folder:
+Notes:
+- If `BREVO_API_KEY` is not set in development, verification/reset links are surfaced in-app for local testing.
+- For production, always set a strong `SECRET_KEY` and use HTTPS.
 
+## Project Layout
+
+```text
+Rising-waters/
+   backend/
+      app.py
+      config.py
+      models.py
+      prediction_engine.py
+      routes_auth.py
+      routes_main.py
+      run.py
+      seed_models.py
+   frontend/
+      templates/
+         auth/
+         errors/
+         main/
+         base.html
+   uploads/
+      models/
+   requirements.txt
+   render.yaml
+   README.md
 ```
-step 1: git add .
-step 2: git commit -m "Initial commit — Rising Waters flood prediction app"
-step 3: git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPO_NAME.git
-step 4: git branch -M main
-step 5: git push -u origin main
-```
 
-For subsequent updates:
-```
-git add .
-git commit -m "Describe your changes here"
-git push
-```
+## Development Notes
 
----
+- `backend/seed_models.py` should be run when setting up a fresh environment or when you want to regenerate model artifacts.
+- `backend/prediction_engine.py` caches loaded models in memory for faster repeated inference.
+- The app creates database tables on startup using `db.create_all()`.
 
-## Deploy on Render (Step-by-Step)
+## Deployment (Render)
 
-### Step 1 — Create a PostgreSQL Database
-1. Log in to https://render.com/
-2. Click **New → PostgreSQL**
-3. Fill in:
-   - **Name:** `rising-waters-db`
-   - **Database:** `flood_prediction`
-   - **User:** `flood_user`
-4. Click **Create Database**
-5. Copy the **Internal Database URL** — you will need it in Step 3
+This repo includes `render.yaml` configured for:
+- Python web service
+- Build command: `pip install -r requirements.txt && python backend/seed_models.py`
+- Start command: `gunicorn --chdir backend run:app --workers 2 --bind 0.0.0.0:$PORT`
+- Managed PostgreSQL database and environment variable wiring
 
-### Step 2 — Create the Web Service
-1. Click **New → Web Service**
-2. Connect your GitHub repository
-3. Set:
-   - **Name:** `rising-waters`
-   - **Environment:** `Python 3`
-   - **Build Command:** `pip install -r requirements.txt && python backend/seed_models.py`
-   - **Start Command:** `gunicorn --chdir backend run:app --workers 2 --bind 0.0.0.0:$PORT`
+### Recommended deployment checklist
+1. Set `FLASK_ENV=production`.
+2. Set a secure `SECRET_KEY`.
+3. Set `APP_DOMAIN` to your live URL.
+4. Configure `DATABASE_URL` (Render can inject it automatically).
+5. Configure Google OAuth redirect URI:
+    - `https://<your-domain>/auth/google/callback`
+6. Configure email delivery (`BREVO_API_KEY`) for real verification/reset emails.
 
-### Step 3 — Set Environment Variables
-Go to your web service → **Environment** tab → add each variable:
+## API Endpoints
 
-| Variable | Value |
-|----------|-------|
-| `FLASK_ENV` | `production` |
-| `SECRET_KEY` | click Generate (Render will generate one) |
-| `DATABASE_URL` | paste the Internal Database URL from Step 1 |
-| `APP_DOMAIN` | `https://rising-waters.onrender.com` |
-| `GOOGLE_CLIENT_ID` | from Google Cloud Console |
-| `GOOGLE_CLIENT_SECRET` | from Google Cloud Console |
-| `TWILIO_ACCOUNT_SID` | from Twilio Console |
-| `TWILIO_AUTH_TOKEN` | from Twilio Console |
-| `TWILIO_PHONE_NUMBER` | your Twilio number e.g. `+12025551234` |
-| `MAIL_SERVER` | `smtp.gmail.com` |
-| `MAIL_PORT` | `587` |
-| `MAIL_USE_TLS` | `True` |
-| `MAIL_USERNAME` | your Gmail address |
-| `MAIL_PASSWORD` | Gmail App Password |
-| `MAIL_DEFAULT_SENDER` | `noreply@yourdomain.com` |
+Authenticated JSON endpoints:
+- `GET /api/predictions/recent`
+- `GET /api/stats`
 
-### Step 4 — Update Google OAuth Callback URL
-In Google Cloud Console → Credentials → your OAuth Client → **Authorized redirect URIs**, add:
-`https://rising-waters.onrender.com/auth/google/callback`
+## License
 
-### Step 5 — Deploy
-In Render → **Manual Deploy → Deploy latest commit**
-
-Render will: install packages → run seed_models.py to train ML models → start Gunicorn. Logs are visible in the Render dashboard.
-
----
-
-## Project Structure
-
-```
-flood-prediction/
-  backend/
-    app.py               Flask factory: registers OAuth, Mail, Login, blueprints
-    config.py            DevelopmentConfig / ProductionConfig / TestingConfig
-    models.py            User (phone/OTP/email-verify fields), MLModel, WeatherData, PredictionResult
-    routes_auth.py       Signup, Login, SMS OTP, Google OAuth, email verify, password reset
-    routes_main.py       Dashboard, Predict, Predictions list/detail/export, Models list
-    prediction_engine.py Loads .pkl files, runs inference, caches models in memory
-    seed_models.py       Trains 3 sklearn classifiers and registers them in DB
-    run.py               Entry point (python backend/run.py)
-  frontend/
-    templates/
-      auth/              login.html, signup.html, verify_phone.html, sms_login.html, google_phone.html,
-                         forgot_password.html, reset_password.html
-      main/              dashboard.html, predict.html, predictions_list.html, prediction_detail.html,
-                         prediction_export.html, models_list.html, about.html
-      errors/            403.html, 404.html, 500.html
-      base.html          Shared layout with sidebar nav
-  uploads/
-    models/              .pkl files saved here by seed_models.py
-  .env.example           Template for environment variables
-  requirements.txt       Python dependencies (Python 3.14 compatible)
-  render.yaml            Render deployment config
-```
+No license file is currently included. Add one (for example, MIT) if you plan to distribute this project publicly.
