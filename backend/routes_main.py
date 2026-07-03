@@ -1,10 +1,11 @@
 import os
 import time
+import requests
 from datetime import datetime, timedelta
 
 from flask import (
     Blueprint, render_template, request, redirect,
-    url_for, flash, jsonify, send_file, abort
+    url_for, flash, jsonify, send_file, abort, current_app
 )
 from flask_login import login_required, current_user
 from flask_wtf import FlaskForm
@@ -317,3 +318,64 @@ def api_stats():
         'daily_predictions': {'labels': labels, 'data': daily_counts},
         'risk_distribution': {'high': high, 'medium': medium, 'low': low},
     })
+
+# ---------------------------------------------------------------------------
+# Flood Bot (Gemini API)
+# ---------------------------------------------------------------------------
+
+@main_bp.route('/api/chatbot', methods=['POST'])
+@login_required
+def chatbot():
+    data = request.get_json(silent=True) or {}
+    user_message = (data.get('message') or '').strip()
+
+    if not user_message:
+        return jsonify({'error': 'Message is required.'}), 400
+
+    api_key = current_app.config.get('GEMINI_API_KEY', '').strip()
+    if not api_key:
+        return jsonify({'error': 'Chatbot is not configured.'}), 503
+
+    system_context = (
+        "You are Flood Bot, a helpful assistant for the Rising Waters flood "
+        "prediction platform. Answer questions about flood risk, flood safety, "
+        "how the platform works, and general flood-related topics concisely "
+        "and clearly. If asked something unrelated to floods or the platform, "
+        "gently steer the conversation back."
+    )
+
+    payload = {
+        "contents": [
+            {
+                "role": "user",
+                "parts": [{"text": f"{system_context}\n\nUser question: {user_message}"}]
+            }
+        ]
+    }
+
+    try:
+        response = requests.post(
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+            headers={
+                "Content-Type": "application/json",
+                "x-goog-api-key": api_key,
+            },
+            json=payload,
+            timeout=15,
+        )
+        response.raise_for_status()
+        result = response.json()
+        reply = (
+            result.get("candidates", [{}])[0]
+            .get("content", {})
+            .get("parts", [{}])[0]
+            .get("text", "Sorry, I could not generate a response.")
+        )
+        return jsonify({'reply': reply})
+
+    except requests.exceptions.RequestException as exc:
+        current_app.logger.error(f'Gemini API request failed: {exc}')
+        return jsonify({'error': 'Chatbot is temporarily unavailable. Please try again.'}), 502
+    except (KeyError, IndexError) as exc:
+        current_app.logger.error(f'Unexpected Gemini API response format: {exc}')
+        return jsonify({'error': 'Chatbot returned an unexpected response.'}), 502

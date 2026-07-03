@@ -51,6 +51,7 @@ class Config:
     APP_DOMAIN = os.getenv('APP_DOMAIN', 'http://localhost:5000')
     PASSWORD_MIN_LENGTH = 8
     BREVO_API_KEY = os.getenv('BREVO_API_KEY', '')
+    GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '')
 
 
 class DevelopmentConfig(Config):
