@@ -108,7 +108,7 @@ def _run_light_migrations(app):
         needed = {
             'pending_email': 'VARCHAR(120)',
             'email_change_code': 'VARCHAR(10)',
-            'email_change_code_expiry': 'DATETIME',
+            'email_change_code_expiry': 'TIMESTAMP',
         }
         with db.engine.begin() as conn:
             for col, coltype in needed.items():
