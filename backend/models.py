@@ -29,6 +29,12 @@ class User(UserMixin, db.Model):
     reset_token = db.Column(db.String(255), nullable=True, unique=True)
     reset_token_expiry = db.Column(db.DateTime, nullable=True)
 
+    # Email change (profile settings) — new address is only applied once the
+    # emailed verification code is confirmed.
+    pending_email = db.Column(db.String(120), nullable=True)
+    email_change_code = db.Column(db.String(10), nullable=True)
+    email_change_code_expiry = db.Column(db.DateTime, nullable=True)
+
     # Role and status
     role = db.Column(db.String(20), default='analyst')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -39,6 +45,7 @@ class User(UserMixin, db.Model):
     # Relationships
     weather_data = db.relationship('WeatherData', backref='user', lazy=True, cascade='all, delete-orphan')
     login_history = db.relationship('LoginHistory', backref='user', lazy=True, cascade='all, delete-orphan')
+    locations = db.relationship('SavedLocation', backref='user', lazy=True, cascade='all, delete-orphan')
 
     # ------------------------------------------------------------------ passwords
     def set_password(self, password):
@@ -85,6 +92,28 @@ class User(UserMixin, db.Model):
         self.reset_token = None
         self.reset_token_expiry = None
 
+    # ------------------------------------------------------------------ email change (profile)
+    def generate_email_change_code(self, new_email):
+        import random
+        self.pending_email = new_email
+        self.email_change_code = f'{random.randint(0, 999999):06d}'
+        self.email_change_code_expiry = datetime.utcnow() + timedelta(minutes=15)
+        return self.email_change_code
+
+    def verify_email_change_code(self, code):
+        if not self.pending_email or not self.email_change_code or not self.email_change_code_expiry:
+            return False
+        if self.email_change_code != code.strip():
+            return False
+        if datetime.utcnow() > self.email_change_code_expiry:
+            return False
+        return True
+
+    def clear_email_change(self):
+        self.pending_email = None
+        self.email_change_code = None
+        self.email_change_code_expiry = None
+
     def __repr__(self):
         return f'<User {self.email}>'
 
@@ -98,6 +127,33 @@ class LoginHistory(db.Model):
     ip_address = db.Column(db.String(45), nullable=True)
     user_agent = db.Column(db.Text, nullable=True)
     auth_method = db.Column(db.String(50), default='password')
+
+
+class SavedLocation(db.Model):
+    """A location a user has saved to monitor weather / flood-risk conditions for."""
+    __tablename__ = 'saved_location'
+
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=False, index=True)
+
+    label = db.Column(db.String(100), nullable=False)          # user-facing name, e.g. "Home"
+    display_name = db.Column(db.String(200), nullable=True)    # resolved place name from geocoder
+    country = db.Column(db.String(100), nullable=True)
+    latitude = db.Column(db.Float, nullable=False)
+    longitude = db.Column(db.Float, nullable=False)
+
+    alerts_enabled = db.Column(db.Boolean, default=True)
+    last_alert_sent_at = db.Column(db.DateTime, nullable=True)
+    last_alert_level = db.Column(db.String(20), nullable=True)  # e.g. 'severe', 'watch'
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint('user_id', 'label', name='uq_user_location_label'),
+    )
+
+    def __repr__(self):
+        return f'<SavedLocation {self.label} ({self.latitude},{self.longitude})>'
 
 
 class MLModel(db.Model):

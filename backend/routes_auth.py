@@ -160,6 +160,47 @@ class CompleteProfileForm(FlaskForm):
             raise ValidationError('Phone number already registered.')
 
 
+class ProfileForm(FlaskForm):
+    username = StringField('Username',
+        validators=[DataRequired(), Length(min=3, max=80)],
+        render_kw={'class': 'form-control'})
+    phone = StringField('Phone Number',
+        validators=[DataRequired(), Regexp(_PHONE_RE, message=_PHONE_MSG)],
+        render_kw={'class': 'form-control'})
+    email = StringField('Email',
+        validators=[DataRequired(), Regexp(_EMAIL_RE, message=_EMAIL_MSG)],
+        render_kw={'class': 'form-control'})
+    submit = SubmitField('Save Changes', render_kw={'class': 'btn btn-primary'})
+
+    def validate_username(self, field):
+        existing = User.query.filter_by(username=field.data).first()
+        if existing and existing.id != current_user.id:
+            raise ValidationError('Username already taken.')
+
+    def validate_phone(self, field):
+        existing = User.query.filter_by(phone=field.data).first()
+        if existing and existing.id != current_user.id:
+            raise ValidationError('Phone number already registered.')
+
+    def validate_email(self, field):
+        existing = User.query.filter_by(email=field.data).first()
+        if existing and existing.id != current_user.id:
+            raise ValidationError('That email is already in use by another account.')
+        existing_pending = User.query.filter(
+            User.pending_email == field.data, User.id != current_user.id
+        ).first()
+        if existing_pending:
+            raise ValidationError('That email is pending verification on another account.')
+
+
+class EmailChangeCodeForm(FlaskForm):
+    code = StringField('Verification Code',
+        validators=[DataRequired(), Length(min=6, max=6, message='Enter the 6-digit code.')],
+        render_kw={'class': 'form-control text-center', 'placeholder': '000000',
+                   'maxlength': '6', 'inputmode': 'numeric', 'autocomplete': 'one-time-code'})
+    submit = SubmitField('Confirm Email Change', render_kw={'class': 'btn btn-primary w-100'})
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Manual Signup flow (email/password + phone)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -479,3 +520,108 @@ def reset_password(token):
         return redirect(url_for('auth.login'))
 
     return render_template('auth/reset_password.html', form=form, token=token)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Profile — update username / phone / email. Changing email requires
+# confirming a code sent to the NEW address before it takes effect.
+# ─────────────────────────────────────────────────────────────────────────────
+
+@auth_bp.route('/profile', methods=['GET', 'POST'])
+@login_required
+def profile():
+    form = ProfileForm(obj=current_user)
+    if request.method == 'GET':
+        form.email.data = current_user.email
+
+    if form.validate_on_submit():
+        current_user.username = form.username.data
+        current_user.phone = form.phone.data
+
+        new_email = form.email.data.strip().lower()
+        if new_email != current_user.email.lower():
+            code = current_user.generate_email_change_code(new_email)
+            db.session.commit()
+
+            body = (
+                f'<p>Hi {current_user.username},</p>'
+                f'<p>We received a request to change the email on your Rising Waters '
+                f'account to this address.</p>'
+                f'<p>Your verification code is:</p>'
+                f'<p style="font-size:1.75rem;font-weight:800;letter-spacing:4px;">{code}</p>'
+                f'<p>Enter this code on the confirmation page to complete the change. '
+                f'It expires in 15 minutes. If you did not request this, you can ignore '
+                f'this email — your account email will not change.</p>'
+            )
+            ok, err = _send_email(new_email, 'Confirm your new Rising Waters email', body)
+            if not ok:
+                flash(f'Profile updated, but the verification email to {new_email} '
+                      f'could not be sent ({err}). Your email was not changed.', 'warning')
+                current_user.clear_email_change()
+                db.session.commit()
+                return redirect(url_for('auth.profile'))
+
+            flash(f'Username and phone updated. A verification code was sent to '
+                  f'{new_email} — enter it to finish changing your email.', 'info')
+            return redirect(url_for('auth.confirm_email_change'))
+
+        db.session.commit()
+        flash('Profile updated successfully.', 'success')
+        return redirect(url_for('auth.profile'))
+
+    return render_template('auth/profile.html', form=form)
+
+
+@auth_bp.route('/profile/confirm-email', methods=['GET', 'POST'])
+@login_required
+def confirm_email_change():
+    if not current_user.pending_email:
+        flash('There is no pending email change.', 'info')
+        return redirect(url_for('auth.profile'))
+
+    form = EmailChangeCodeForm()
+    if form.validate_on_submit():
+        if current_user.verify_email_change_code(form.code.data):
+            current_user.email = current_user.pending_email
+            current_user.email_verified = True
+            current_user.clear_email_change()
+            db.session.commit()
+            flash('Your email address has been updated.', 'success')
+            return redirect(url_for('auth.profile'))
+        else:
+            form.code.errors.append('Incorrect or expired code.')
+
+    return render_template('auth/confirm_email_change.html', form=form,
+                           pending_email=current_user.pending_email)
+
+
+@auth_bp.route('/profile/resend-email-code')
+@login_required
+def resend_email_change_code():
+    if not current_user.pending_email:
+        flash('There is no pending email change.', 'info')
+        return redirect(url_for('auth.profile'))
+
+    code = current_user.generate_email_change_code(current_user.pending_email)
+    db.session.commit()
+    body = (
+        f'<p>Hi {current_user.username},</p>'
+        f'<p>Here is your new verification code:</p>'
+        f'<p style="font-size:1.75rem;font-weight:800;letter-spacing:4px;">{code}</p>'
+        f'<p>It expires in 15 minutes.</p>'
+    )
+    ok, err = _send_email(current_user.pending_email, 'Confirm your new Rising Waters email', body)
+    if ok:
+        flash('A new verification code has been sent.', 'success')
+    else:
+        flash(f'Could not resend the code: {err}.', 'danger')
+    return redirect(url_for('auth.confirm_email_change'))
+
+
+@auth_bp.route('/profile/cancel-email-change')
+@login_required
+def cancel_email_change():
+    current_user.clear_email_change()
+    db.session.commit()
+    flash('Email change cancelled.', 'info')
+    return redirect(url_for('auth.profile'))

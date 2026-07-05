@@ -1,0 +1,127 @@
+{% extends 'base.html' %}
+{% block title %}Your Location Weather — Rising Waters{% endblock %}
+
+{% block content %}
+<div class="row mb-4 align-items-center">
+    <div class="col-md-8">
+        <h1 class="mb-1 fw-bold"><i class="bi bi-geo-alt"></i> Your Location Weather</h1>
+        <p class="text-muted mb-0">Save locations to monitor conditions and get emailed if severe weather develops.</p>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h6 class="mb-0 fw-bold"><i class="bi bi-plus-circle me-1"></i> Add a Location</h6>
+            </div>
+            <div class="card-body">
+                <form method="POST" novalidate>
+                    {{ form.hidden_tag() }}
+                    <div class="mb-3">
+                        <label class="form-label">Label</label>
+                        {{ form.label(class="form-control" + (" is-invalid" if form.label.errors else "")) }}
+                        {% for e in form.label.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">City / Place</label>
+                        {{ form.query(class="form-control" + (" is-invalid" if form.query.errors else "")) }}
+                        {% for e in form.query.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+                        <div class="form-text">e.g. "Pune, Maharashtra" or "London, UK"</div>
+                    </div>
+                    <div class="form-check mb-3">
+                        {{ form.alerts_enabled(class="form-check-input") }}
+                        <label class="form-check-label" for="{{ form.alerts_enabled.id }}">
+                            Email me about severe weather here
+                        </label>
+                    </div>
+                    {{ form.submit() }}
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-8">
+        {% if not locations %}
+        <div class="card">
+            <div class="card-body text-center py-5 text-muted">
+                <i class="bi bi-cloud-sun fs-1 mb-2 d-block"></i>
+                No saved locations yet. Add one to start monitoring.
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="row g-3">
+        {% for loc in locations %}
+            {% set snap = snapshots.get(loc.id) %}
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+                            <div>
+                                <h6 class="fw-bold mb-0">{{ loc.label }}</h6>
+                                <small class="text-muted">{{ loc.display_name or '' }}</small>
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                {% if snap and snap.alerts %}
+                                    {% set top = snap.alerts[0][0] %}
+                                    <span class="badge {{ 'bg-danger' if top == 'severe' else 'bg-warning text-dark' }}">
+                                        {{ 'Severe' if top == 'severe' else 'Watch' }}
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-success">Normal</span>
+                                {% endif %}
+                                <a href="{{ url_for('main.location_weather', location_id=loc.id) }}"
+                                   class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-eye"></i> Details
+                                </a>
+                            </div>
+                        </div>
+
+                        {% if snap and snap.weather %}
+                        <div class="row g-3 mt-1">
+                            <div class="col-6 col-md-3">
+                                <div class="text-muted small">Temperature</div>
+                                <div class="fw-bold">{{ snap.weather.temperature }}°C</div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="text-muted small">Humidity</div>
+                                <div class="fw-bold">{{ snap.weather.humidity }}%</div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="text-muted small">Precipitation</div>
+                                <div class="fw-bold">{{ snap.weather.precipitation }} mm/h</div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="text-muted small">Condition</div>
+                                <div class="fw-bold">{{ snap.weather.condition }}</div>
+                            </div>
+                        </div>
+                        {% elif snap and snap.error %}
+                        <div class="text-danger small mt-2">Could not fetch weather: {{ snap.error }}</div>
+                        {% endif %}
+
+                        <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top">
+                            <form method="POST" action="{{ url_for('main.toggle_location_alerts', location_id=loc.id) }}">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-sm btn-link p-0 text-decoration-none">
+                                    <i class="bi bi-{{ 'bell' if loc.alerts_enabled else 'bell-slash' }} me-1"></i>
+                                    Alerts {{ 'On' if loc.alerts_enabled else 'Off' }}
+                                </button>
+                            </form>
+                            <form method="POST" action="{{ url_for('main.delete_location', location_id=loc.id) }}"
+                                  onsubmit="return confirm('Remove {{ loc.label }}?');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-sm btn-link text-danger p-0 text-decoration-none">
+                                    <i class="bi bi-trash me-1"></i> Remove
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

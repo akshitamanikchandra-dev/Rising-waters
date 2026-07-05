@@ -65,7 +65,11 @@ def create_app(config_name='development'):
     @app.before_request
     def enforce_profile_completion():
         if current_user.is_authenticated and (not current_user.phone or not current_user.username):
-            allowed_endpoints = {'auth.complete_profile', 'auth.logout', 'static'}
+            allowed_endpoints = {
+                'auth.complete_profile', 'auth.logout', 'static',
+                'auth.profile', 'auth.confirm_email_change',
+                'auth.resend_email_change_code', 'auth.cancel_email_change',
+            }
             if request.endpoint not in allowed_endpoints:
                 return redirect(url_for('auth.complete_profile'))
 
@@ -73,8 +77,45 @@ def create_app(config_name='development'):
 
     with app.app_context():
         db.create_all()
+        _run_light_migrations(app)
+
+    # Background job: periodic severe-weather check for saved locations.
+    # Guarded so the debug reloader's parent watcher process doesn't also start it.
+    _reloader_ok = (not app.debug) or os.environ.get('WERKZEUG_RUN_MAIN') == 'true'
+    if not app.config.get('TESTING') and _reloader_ok:
+        try:
+            from alerts import init_scheduler
+            interval = int(os.getenv('WEATHER_ALERT_INTERVAL_MINUTES', '60'))
+            init_scheduler(app, interval_minutes=interval)
+        except Exception:
+            app.logger.exception('Could not start the weather-alert scheduler.')
 
     return app
+
+
+def _run_light_migrations(app):
+    """db.create_all() only creates missing TABLES, not missing COLUMNS on
+    tables that already exist. For a pre-existing SQLite file (as shipped in
+    this repo), add any new columns that earlier versions of this schema
+    didn't have, so the app doesn't crash on first request after an update."""
+    from sqlalchemy import inspect, text
+
+    try:
+        inspector = inspect(db.engine)
+        if 'users' not in inspector.get_table_names():
+            return
+        existing_cols = {c['name'] for c in inspector.get_columns('users')}
+        needed = {
+            'pending_email': 'VARCHAR(120)',
+            'email_change_code': 'VARCHAR(10)',
+            'email_change_code_expiry': 'DATETIME',
+        }
+        with db.engine.begin() as conn:
+            for col, coltype in needed.items():
+                if col not in existing_cols:
+                    conn.execute(text(f'ALTER TABLE users ADD COLUMN {col} {coltype}'))
+    except Exception:
+        app.logger.exception('Light schema migration failed (non-fatal).')
 
 
 def _register_error_handlers(app):

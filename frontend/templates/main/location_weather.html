@@ -1,0 +1,103 @@
+{% extends 'base.html' %}
+{% block title %}{{ location.label }} Weather — Rising Waters{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <div>
+        <a href="{{ url_for('main.locations') }}" class="text-decoration-none small text-muted">
+            <i class="bi bi-arrow-left"></i> Back to Your Location Weather
+        </a>
+        <h1 class="mb-1 fw-bold mt-1"><i class="bi bi-geo-alt-fill text-primary"></i> {{ location.label }}</h1>
+        <p class="text-muted mb-0">{{ location.display_name or '' }}</p>
+    </div>
+</div>
+
+{% if error %}
+<div class="alert alert-danger">Could not fetch weather data: {{ error }}</div>
+{% elif not weather %}
+<div class="alert alert-warning">No weather data available right now.</div>
+{% else %}
+
+{% for level, message in alerts %}
+<div class="alert {{ 'alert-danger' if level == 'severe' else 'alert-warning' }} d-flex align-items-center gap-2">
+    <i class="bi bi-exclamation-triangle-fill fs-5"></i>
+    <div>{{ message }}</div>
+</div>
+{% endfor %}
+{% if not alerts %}
+<div class="alert alert-success d-flex align-items-center gap-2">
+    <i class="bi bi-check-circle-fill fs-5"></i>
+    <div>No severe conditions detected right now.</div>
+</div>
+{% endif %}
+
+<div class="row g-3 mb-4">
+    <div class="col-6 col-lg-2">
+        <div class="metric-card">
+            <div class="metric-icon"><i class="bi bi-thermometer-half"></i></div>
+            <div class="metric-value">{{ weather.temperature }}°C</div>
+            <div class="metric-label">Temperature</div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-2">
+        <div class="metric-card">
+            <div class="metric-icon"><i class="bi bi-droplet-half"></i></div>
+            <div class="metric-value">{{ weather.humidity }}%</div>
+            <div class="metric-label">Humidity</div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-2">
+        <div class="metric-card">
+            <div class="metric-icon"><i class="bi bi-cloud-rain"></i></div>
+            <div class="metric-value">{{ weather.precipitation }}</div>
+            <div class="metric-label">Precip (mm/h)</div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-2">
+        <div class="metric-card">
+            <div class="metric-icon"><i class="bi bi-wind"></i></div>
+            <div class="metric-value">{{ weather.wind_speed }}</div>
+            <div class="metric-label">Wind (km/h)</div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-2">
+        <div class="metric-card">
+            <div class="metric-icon"><i class="bi bi-eye"></i></div>
+            <div class="metric-value">{{ weather.condition }}</div>
+            <div class="metric-label">Condition</div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-2">
+        <div class="metric-card">
+            <div class="metric-icon"><i class="bi bi-cloud-drizzle"></i></div>
+            <div class="metric-value">{{ weather.today_precip_sum }} mm</div>
+            <div class="metric-label">Today's Total Rain</div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header bg-white">
+        <h6 class="mb-0 fw-bold"><i class="bi bi-calendar3 me-1"></i> 3-Day Forecast</h6>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+                <thead>
+                    <tr><th>Date</th><th>Rain Total (mm)</th><th>Rain Probability</th></tr>
+                </thead>
+                <tbody>
+                {% for day in forecast %}
+                    <tr>
+                        <td>{{ day.date }}</td>
+                        <td>{{ day.precip_sum }}</td>
+                        <td>{{ day.precip_probability }}%</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

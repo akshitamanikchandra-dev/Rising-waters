@@ -9,11 +9,12 @@ from flask import (
 )
 from flask_login import login_required, current_user
 from flask_wtf import FlaskForm
-from wtforms import FloatField, StringField, TextAreaField, SelectField, SubmitField
-from wtforms.validators import DataRequired, NumberRange, Optional
+from wtforms import FloatField, StringField, TextAreaField, SelectField, SubmitField, BooleanField
+from wtforms.validators import DataRequired, NumberRange, Optional, Length
 
-from models import db, MLModel, WeatherData, PredictionResult
+from models import db, MLModel, WeatherData, PredictionResult, SavedLocation
 from prediction_engine import PredictionEngine
+import weather_service
 
 main_bp = Blueprint('main', __name__)
 
@@ -70,6 +71,22 @@ class PredictForm(FlaskForm):
     submit = SubmitField('Run Prediction', render_kw={'class': 'btn btn-primary btn-lg w-100'})
 
 
+class AddLocationForm(FlaskForm):
+    """Add a saved location by name (e.g. city) for weather monitoring."""
+    label = StringField(
+        'Label',
+        validators=[DataRequired(), Length(min=1, max=100)],
+        render_kw={'class': 'form-control', 'placeholder': 'e.g. Home, Office, Mumbai'}
+    )
+    query = StringField(
+        'City / Place',
+        validators=[DataRequired(), Length(min=2, max=200)],
+        render_kw={'class': 'form-control', 'placeholder': 'e.g. Pune, Maharashtra'}
+    )
+    alerts_enabled = BooleanField('Email me about severe weather here', default=True)
+    submit = SubmitField('Add Location', render_kw={'class': 'btn btn-primary'})
+
+
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
@@ -120,6 +137,8 @@ def dashboard():
         avg = round(sum(p.flood_probability for p in day_preds) / len(day_preds) * 100, 1) if day_preds else 0
         chart_data.append(avg)
 
+    active_models = MLModel.query.filter_by(is_active=True).order_by(MLModel.accuracy.desc()).all()
+
     return render_template(
         'main/dashboard.html',
         total_predictions=total,
@@ -130,6 +149,7 @@ def dashboard():
         recent_predictions=all_predictions[:10],
         chart_labels=chart_labels,
         chart_data=chart_data,
+        models=active_models,
     )
 
 
@@ -255,6 +275,111 @@ def about():
     """About page."""
     models = MLModel.query.filter_by(is_active=True).all()
     return render_template('main/about.html', models=models)
+
+
+# ---------------------------------------------------------------------------
+# Your Location Weather — saved locations, live conditions & alert emails
+# ---------------------------------------------------------------------------
+
+@main_bp.route('/locations', methods=['GET', 'POST'])
+@login_required
+def locations():
+    """List saved locations with a quick current-conditions snapshot, and
+    let the user add a new one."""
+    form = AddLocationForm()
+
+    if form.validate_on_submit():
+        matches = weather_service.geocode(form.query.data.strip())
+        if not matches:
+            flash(f'Could not find a place matching "{form.query.data}". '
+                  f'Try a more specific name (e.g. add state/country).', 'danger')
+        else:
+            best = matches[0]
+            existing = SavedLocation.query.filter_by(
+                user_id=current_user.id, label=form.label.data.strip()
+            ).first()
+            if existing:
+                flash(f'You already have a saved location labeled "{form.label.data}".', 'danger')
+            else:
+                place_bits = [best['name'], best.get('admin1'), best.get('country')]
+                display_name = ', '.join(b for b in place_bits if b)
+                loc = SavedLocation(
+                    user_id=current_user.id,
+                    label=form.label.data.strip(),
+                    display_name=display_name,
+                    country=best.get('country'),
+                    latitude=best['latitude'],
+                    longitude=best['longitude'],
+                    alerts_enabled=form.alerts_enabled.data,
+                )
+                db.session.add(loc)
+                db.session.commit()
+                flash(f'Added "{loc.label}" ({display_name}) to your monitored locations.', 'success')
+                return redirect(url_for('main.locations'))
+
+    saved = SavedLocation.query.filter_by(user_id=current_user.id).order_by(SavedLocation.created_at.desc()).all()
+
+    snapshots = {}
+    for loc in saved:
+        weather, err = weather_service.get_weather(loc.latitude, loc.longitude)
+        snapshots[loc.id] = {
+            'weather': weather,
+            'error': err,
+            'alerts': weather_service.evaluate_alerts(weather) if weather else [],
+        }
+
+    return render_template('main/locations.html', form=form, locations=saved, snapshots=snapshots)
+
+
+@main_bp.route('/locations/<location_id>/delete', methods=['POST'])
+@login_required
+def delete_location(location_id):
+    loc = db.session.get(SavedLocation, location_id)
+    if not loc or loc.user_id != current_user.id:
+        abort(404)
+    db.session.delete(loc)
+    db.session.commit()
+    flash(f'Removed "{loc.label}" from your monitored locations.', 'info')
+    return redirect(url_for('main.locations'))
+
+
+@main_bp.route('/locations/<location_id>/toggle-alerts', methods=['POST'])
+@login_required
+def toggle_location_alerts(location_id):
+    loc = db.session.get(SavedLocation, location_id)
+    if not loc or loc.user_id != current_user.id:
+        abort(404)
+    loc.alerts_enabled = not loc.alerts_enabled
+    db.session.commit()
+    flash(f'Email alerts for "{loc.label}" are now '
+          f'{"enabled" if loc.alerts_enabled else "disabled"}.', 'info')
+    return redirect(url_for('main.locations'))
+
+
+@main_bp.route('/locations/<location_id>/weather')
+@login_required
+def location_weather(location_id):
+    """Detailed current + 3-day forecast view for a single saved location."""
+    loc = db.session.get(SavedLocation, location_id)
+    if not loc or loc.user_id != current_user.id:
+        abort(404)
+
+    weather, err = weather_service.get_weather(loc.latitude, loc.longitude)
+    alerts = weather_service.evaluate_alerts(weather) if weather else []
+
+    forecast = []
+    if weather:
+        for date, precip, prob in zip(
+            weather.get('forecast_dates', []),
+            weather.get('forecast_precip_sum', []),
+            weather.get('forecast_precip_probability', []),
+        ):
+            forecast.append({'date': date, 'precip_sum': precip, 'precip_probability': prob})
+
+    return render_template(
+        'main/location_weather.html',
+        location=loc, weather=weather, error=err, alerts=alerts, forecast=forecast,
+    )
 
 
 # ---------------------------------------------------------------------------
