@@ -1,23 +1,50 @@
-# Rising Waters 🌊
+# 🌊 Rising Waters — AI-Powered Flood Prediction Platform
 
-A full-stack flood risk prediction web application built with **Flask**, **SQLAlchemy**, and **scikit-learn / XGBoost**. Rising Waters lets users run ML-powered flood predictions, monitor live weather conditions for saved locations, receive automated email alerts, and get AI-assisted answers from a built-in flood assistant chatbot.
+> **An intelligent, full-stack flood risk assessment platform** powered by Machine Learning and Generative AI — helping communities predict, prepare for, and respond to flood events in real time.
 
 ---
 
-## Features
+## 🚨 The Problem
 
-| Area | Details |
+Flooding is one of the most destructive and frequently occurring natural disasters worldwide. Communities often lack accessible, data-driven tools to predict flood risk for their specific location — leaving residents underprepared and emergency responders reactive rather than proactive.
+
+**Rising Waters** solves this by putting AI-powered flood risk intelligence directly in the hands of anyone with an internet connection.
+
+---
+
+## 🎯 Key Features
+
+| Feature | Description |
 |---|---|
-| **Authentication** | Email/password signup with verification, Google OAuth, password reset, login history |
-| **Profile Management** | Username, phone, profile picture (Google), email change with OTP confirmation |
-| **Flood Prediction** | 5-feature ML inference (annual rainfall, cloud visibility, temperature, humidity, seasonal rainfall) |
-| **ML Model Registry** | 4 trained models stored in DB: Random Forest, Gradient Boosting, Logistic Regression, XGBoost |
-| **Dashboard** | Aggregated stats, risk distribution, 7-day prediction trend chart |
-| **Prediction History** | Paginated list, per-prediction detail view, text export |
-| **Location Monitoring** | Save named locations, view live weather + 3-day forecast via Open-Meteo (no API key needed) |
-| **Automated Weather Alerts** | APScheduler background job checks every saved location hourly and emails severe-weather warnings |
-| **AI Chatbot (Flood Bot)** | Gemini 2.5 Flash powered assistant for flood safety and platform questions |
-| **Deployment** | Render-ready (`render.yaml`) with managed PostgreSQL |
+| 🤖 **ML Flood Prediction** | XGBoost/scikit-learn model predicts flood risk from environmental inputs |
+| ☁️ **Live Weather Monitoring** | Real-time weather & forecasts via Open-Meteo API for saved locations |
+| 🔔 **Automated Alerts** | Background scheduler sends severe-weather email alerts automatically |
+| 💬 **Flood Bot (AI Chatbot)** | Gemini-powered conversational assistant for flood risk Q&A |
+| 📊 **Interactive Dashboard** | Data visualizations of risk levels, historical trends, and forecasts |
+| 📄 **PDF Report Generation** | Download detailed flood risk assessment reports |
+| 🔐 **User Authentication** | Secure login, registration, OTP-based email verification |
+| 📍 **Saved Locations** | Save and monitor multiple locations for flood risk |
+
+---
+
+## 🧠 Tech Stack
+
+| Layer | Technology |
+|---|---|
+| **ML / AI** | Python, scikit-learn, XGBoost, Google Gemini 2.5 Flash |
+| **Backend** | Python, Flask, SQLAlchemy, APScheduler |
+| **Frontend** | HTML5, CSS3, JavaScript |
+| **Database** | SQLite (dev) / PostgreSQL (prod) |
+| **Weather API** | Open-Meteo (geocoding + live weather) |
+| **Email** | Flask-Mail / SMTP |
+| **Deployment** | Render |
+| **Auth** | Flask-Login, OTP-based email verification |
+
+---
+
+## 🚀 Live Demo
+
+🔗 **[View the Live App →](https://rising-waters.onrender.com)** *(hosted on Render)*
 
 ---
 
@@ -230,7 +257,7 @@ Start:  gunicorn --chdir backend run:app --workers 2 --bind 0.0.0.0:$PORT
 
 1. Set `FLASK_ENV=production`.
 2. Set a secure `SECRET_KEY` (Render can auto-generate one).
-3. Set `APP_DOMAIN` to your live URL (e.g. `https://rising-waters.onrender.com`).
+3. Set `APP_DOMAIN` to your live URL.
 4. `DATABASE_URL` is injected automatically from the managed database.
 5. Configure Google OAuth → add the redirect URI:
    ```
